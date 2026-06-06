@@ -324,6 +324,12 @@
     </select>
   </div>
 
+  <div style="max-width:1100px;margin:15px auto;padding:0 16px;">
+  <button class="btn primary" onclick="openSellModal()">
+    + Pasang Iklan
+  </button>
+  </div>
+
   <div class="stats">
     <div class="stat"><div class="label">Total Item</div><div class="value" id="totalItems">0</div></div>
     <div class="stat"><div class="label">Kategori Aktif</div><div class="value" id="activeCategory">Semua</div></div>
@@ -351,6 +357,26 @@
         <a id="dcLink" class="link-btn dc" target="_blank" rel="noopener">Discord</a>
       </div>
     </div>
+  </div>
+  <div class="modal" id="sellModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <strong>Pasang Iklan</strong>
+      <button class="close" onclick="closeSellModal()">×</button>
+    </div>
+
+    <input id="itemName" class="search" placeholder="Nama Item"><br><br>
+
+    <input id="itemPrice" class="search" type="number" placeholder="Harga WL"><br><br>
+
+    <input id="itemWorld" class="search" placeholder="World"><br><br>
+
+    <input id="itemSeller" class="search" placeholder="Nama Seller"><br><br>
+
+    <button class="btn primary" onclick="submitItem()">
+      Pasang Iklan
+    </button>
+  </div>
   </div>
 
   <script>
@@ -513,6 +539,42 @@
     });
 
     render();
+    function openSellModal() {
+  document.getElementById('sellModal').classList.add('open');
+}
+
+function closeSellModal() {
+  document.getElementById('sellModal').classList.remove('open');
+}
+
+function submitItem() {
+  const name = document.getElementById('itemName').value;
+  const price = document.getElementById('itemPrice').value;
+  const world = document.getElementById('itemWorld').value;
+  const seller = document.getElementById('itemSeller').value;
+
+  if (!name || !price || !world || !seller) {
+    alert("Lengkapi semua data!");
+    return;
+  }
+
+  items.unshift({
+    name,
+    price: Number(price),
+    unit: 'WL',
+    category: 'rare',
+    seller,
+    world,
+    stock: 1
+  });
+
+  render();
+
+  closeSellModal();
+
+  alert("Iklan berhasil dipasang!");
+}
   </script>
+  
 </body>
 </html>
