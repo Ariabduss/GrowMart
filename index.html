@@ -395,13 +395,13 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Ubah menjadi let supaya array-nya bisa diperbarui saat load data dari database
+    // Array penampung data iklan
     let items = [
-      { name: '200 Lava Seed', price: 2, unit: 'WL', category: 'seed', seller: 'GrowPro', world: 'WLGROWPRO', stock: 18 },
-      { name: '100 Chandelier', price: 1, unit: 'WL', category: 'block', seller: 'LampShop', world: 'WLLAMPSHOP', stock: 6 },
-      { name: '50 Pepper Tree', price: 3, unit: 'WL', category: 'seed', seller: 'PepperKing', world: 'WLPEPPER', stock: 12 },
-      { name: '200 Dirt Block', price: 1, unit: 'WL', category: 'block', seller: 'BlockMart', world: 'WLBLOCK', stock: 24 },
-      { name: '10 Magplant', price: 25, unit: 'WL', category: 'rare', seller: 'RareVault', world: 'WLRARE', stock: 2 }
+      { name: '200 Lava Seed', price: 2, unit: 'WL', category: 'seed', seller: 'GrowPro', world: 'WLGROWPRO', stock: 18, createdAt: Date.now() },
+      { name: '100 Chandelier', price: 1, unit: 'WL', category: 'block', seller: 'LampShop', world: 'WLLAMPSHOP', stock: 6, createdAt: Date.now() },
+      { name: '50 Pepper Tree', price: 3, unit: 'WL', category: 'seed', seller: 'PepperKing', world: 'WLPEPPER', stock: 12, createdAt: Date.now() },
+      { name: '200 Dirt Block', price: 1, unit: 'WL', category: 'block', seller: 'BlockMart', world: 'WLBLOCK', stock: 24, createdAt: Date.now() },
+      { name: '10 Magplant', price: 25, unit: 'WL', category: 'rare', seller: 'RareVault', world: 'WLRARE', stock: 2, createdAt: Date.now() }
     ];
 
     const itemList = document.getElementById('itemList');
@@ -471,7 +471,7 @@
         ${cardsHtml}
       `;
 
-      // Assign click events dynamically karena modul JS tidak mengekspos fungsi ke global window
+      // Assign click events
       document.querySelectorAll('.wishlist').forEach(btn => {
         btn.onclick = () => toggleWishlist(btn.getAttribute('data-name'));
       });
@@ -492,16 +492,28 @@
       renderTimer = setTimeout(renderNow, 120);
     }
 
-    // Fungsi Ambil Data dari Firestore
+    // Fungsi Ambil Data dari Firestore + Filter 48 Jam Otomatis
     async function loadItems() {
       try {
         const snapshot = await getDocs(collection(db, "items"));
         const fbItems = [];
+        const batasWaktu = 48 * 60 * 60 * 1000; // 48 jam dalam milidetik
+        const waktuSekarang = Date.now();
+
         snapshot.forEach(doc => {
-          fbItems.push(doc.data());
+          const data = doc.data();
+          
+          // Filter: Hanya tampilkan jika tidak punya createdAt ATAU umurnya belum lewat 48 jam
+          if (!data.createdAt || (waktuSekarang - data.createdAt < batasWaktu)) {
+            fbItems.push(data);
+          }
         });
+
+        // Urutkan dari iklan terbaru ke terlama berdasarkan tanggal dibuat
+        fbItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
         if(fbItems.length > 0) {
-          items = fbItems; // Gunakan data cloud jika tersedia
+          items = fbItems; 
         }
         render();
       } catch (err) {
@@ -539,7 +551,7 @@
       openModal(item);
     }
 
-    // Pasang Iklan Baru ke Firestore
+    // Pasang Iklan Baru ke Firestore + Simpan Waktu Upload
     async function submitItem() {
       const name = document.getElementById("itemName").value;
       const price = Number(document.getElementById("itemPrice").value);
@@ -552,6 +564,7 @@
         return;
       }
 
+      // Record waktu saat ini menggunakan Date.now()
       const newItem = {
         name,
         price,
@@ -559,17 +572,18 @@
         seller,
         category,
         unit: "WL",
-        stock: 1
+        stock: 1,
+        createdAt: Date.now() 
       };
 
       try {
         await addDoc(collection(db, "items"), newItem);
         alert("Iklan berhasil dipasang di cloud!");
         closeSellModal();
-        loadItems(); // Refresh data otomatis
+        loadItems(); // Refresh data otomatis dari Firestore
       } catch (e) {
         console.error("Error menambah data: ", e);
-        // Fallback lokal jika Firebase bermasalah
+        // Fallback lokal jika jaringan/Firebase bermasalah
         items.unshift(newItem);
         render();
         closeSellModal();
@@ -596,7 +610,7 @@
     sortBox.addEventListener('change', render);
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
 
-    // Jalankan pertama kali saat aplikasi dibuka
+    // Inisialisasi awal saat halaman dibuka
     if (localStorage.getItem('theme') === 'dark') {
       document.body.classList.add('dark');
       document.getElementById('themeBtn').textContent = '☀️ Light Mode';
