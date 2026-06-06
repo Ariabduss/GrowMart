@@ -189,7 +189,6 @@
       background: rgba(245,158,11,0.12);
       color: #d97706;
     }
-    /* Style Tambahan untuk Label Sisa Waktu */
     .timer-tag {
       background: rgba(239, 68, 68, 0.1) !important;
       color: #ef4444 !important;
@@ -201,12 +200,21 @@
       gap: 8px;
       margin-top: 12px;
     }
+    /* Grid 3 Kolom untuk aksi utama kartu */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 12px;
+    }
     .btn {
       border: none;
       border-radius: 10px;
       cursor: pointer;
       font-weight: bold;
-      padding: 10px 12px;
+      padding: 10px 8px;
+      font-size: 13px;
+      text-align: center;
     }
     .btn.primary {
       background: var(--primary);
@@ -217,6 +225,12 @@
       background: var(--chip);
       color: var(--text);
     }
+    .btn.bump {
+      background: #f59e0b;
+      color: white;
+    }
+    .btn.bump:hover { background: #d97706; }
+    
     .wishlist {
       position: absolute;
       top: 12px;
@@ -331,7 +345,7 @@
   </div>
 
   <div style="max-width:1100px;margin:15px auto;padding:0 16px;">
-    <button class="btn primary" id="openSellBtn">+ Pasang Iklan</button>
+    <button class="btn primary" id="openSellBtn" style="padding:12px 20px; font-size:15px;">+ Pasang Iklan</button>
   </div>
 
   <div class="stats">
@@ -379,272 +393,328 @@
         <option value="farm">Farm</option>
         <option value="rare">Rare</option>
       </select><br><br>
-      <button class="btn primary" id="submitItemBtn">Pasang Iklan</button>
+      <input id="itemPin" class="search" type="password" maxlength="4" placeholder="Buat PIN 4-Angka (Untuk Sundul/Hapus)"><br><br>
+      <button class="btn primary" id="submitItemBtn" style="width:100%;">Pasang Iklan</button>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    // Menambahkan updateDoc dan doc untuk mengedit data di Firebase
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Konfigurasi Firebase milikmu
-const firebaseConfig = {
-  apiKey: "AIzaSyBCaaqw2TaFnaGZJiAiMEq9VbOlBnrXezI",
-  authDomain: "growmart-92dee.firebaseapp.com",
-  projectId: "growmart-92dee",
-  storageBucket: "growmart-92dee.firebasestorage.app",
-  messagingSenderId: "690014710400",
-  appId: "1:690014710400:web:1c46d4f399c2f0a9d19465",
-  measurementId: "G-2EC9S745HM"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCaaqw2TaFnaGZJiAiMEq9VbOlBnrXezI",
+      authDomain: "growmart-92dee.firebaseapp.com",
+      projectId: "growmart-92dee",
+      storageBucket: "growmart-92dee.firebasestorage.app",
+      messagingSenderId: "690014710400",
+      appId: "1:690014710400:web:1c46d4f399c2f0a9d19465",
+      measurementId: "G-2EC9S745HM"
+    };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-let items = [];
-const batasWaktuGlobal = 48 * 60 * 60 * 1000; // 48 jam dalam milidetik
+    let items = [];
+    const batasWaktuGlobal = 48 * 60 * 60 * 1000; 
 
-const itemList = document.getElementById('itemList');
-const searchBox = document.getElementById('searchBox');
-const filterBox = document.getElementById('filterBox');
-const sortBox = document.getElementById('sortBox');
-const totalItems = document.getElementById('totalItems');
-const visibleItems = document.getElementById('visibleItems');
-const activeCategory = document.getElementById('activeCategory');
-const emptyState = document.getElementById('emptyState');
-const wishlistCount = document.getElementById('wishlistCount');
+    const itemList = document.getElementById('itemList');
+    const searchBox = document.getElementById('searchBox');
+    const filterBox = document.getElementById('filterBox');
+    const sortBox = document.getElementById('sortBox');
+    const totalItems = document.getElementById('totalItems');
+    const visibleItems = document.getElementById('visibleItems');
+    const activeCategory = document.getElementById('activeCategory');
+    const emptyState = document.getElementById('emptyState');
+    const wishlistCount = document.getElementById('wishlistCount');
 
-const wishlist = new Set(JSON.parse(localStorage.getItem('wishlist') || '[]'));
-let renderTimer = null;
+    const wishlist = new Set(JSON.parse(localStorage.getItem('wishlist') || '[]'));
+    let renderTimer = null;
 
-// Fungsi hitung mundur yang aman dari eror NaN
-function dapatkanSisaWaktuText(createdAt) {
-  const waktuPembuatan = Number(createdAt);
-  if (!waktuPembuatan || isNaN(waktuPembuatan)) {
-    return "Sisa: 48j 0m 0d"; 
-  }
+    function dapatkanSisaWaktuText(createdAt) {
+      const waktuPembuatan = Number(createdAt);
+      if (!waktuPembuatan || isNaN(waktuPembuatan)) return "Sisa: 48j 0m 0d";
 
-  const selisih = (waktuPembuatan + batasWaktuGlobal) - Date.now();
-  if (selisih <= 0) return "Kedaluwarsa";
+      const selisih = (waktuPembuatan + batasWaktuGlobal) - Date.now();
+      if (selisih <= 0) return "Kedaluwarsa";
 
-  const totalDetik = Math.floor(selisih / 1000);
-  const jam = Math.floor(totalDetik / 3600);
-  const menit = Math.floor((totalDetik % 3600) / 60);
-  const detik = totalDetik % 60;
+      const totalDetik = Math.floor(selisih / 1000);
+      const jam = Math.floor(totalDetik / 3600);
+      const menit = Math.floor((totalDetik % 3600) / 60);
+      const detik = totalDetik % 60;
 
-  return `Sisa: ${jam}j ${menit}m ${detik}d`;
-}
-
-// Fungsi Render Tampilan Data
-function renderNow() {
-  const q = searchBox.value.toLowerCase().trim();
-  const category = filterBox.value;
-  const sort = sortBox.value;
-
-  activeCategory.textContent = category === 'all' ? 'Semua' : category;
-  totalItems.textContent = items.length;
-
-  let filtered = items.filter(item => {
-    const matchText =
-      (item.name || '').toLowerCase().includes(q) ||
-      (item.seller || '').toLowerCase().includes(q) ||
-      (item.world || '').toLowerCase().includes(q);
-    const matchCategory = category === 'all' || item.category === category;
-    return matchText && matchCategory;
-  });
-
-  if (sort === 'price-asc') filtered.sort((a, b) => a.price - b.price);
-  if (sort === 'price-desc') filtered.sort((a, b) => b.price - a.price);
-
-  visibleItems.textContent = filtered.length;
-  emptyState.style.display = filtered.length ? 'none' : 'block';
-
-  const cardsHtml = filtered.map((item, index) => {
-    const isWish = wishlist.has(item.name);
-    const sisaWaktuText = dapatkanSisaWaktuText(item.createdAt);
-
-    return `
-      <div class="post">
-        <button class="wishlist ${isWish ? 'active' : ''}" data-name="${item.name}">${isWish ? '♥' : '♡'}</button>
-        <h2>${item.name}</h2>
-        <p class="price">Harga: ${item.price} ${item.unit || 'WL'}</p>
-        <div class="meta">
-          <span class="tag">${item.category}</span>
-          <span class="tag">Seller: ${item.seller}</span>
-          <span class="tag">World: ${item.world}</span>
-          <span class="tag timer-tag" data-created="${item.createdAt || Date.now()}">${sisaWaktuText}</span>
-        </div>
-        <span class="stock ${(item.stock || 1) <= 5 ? 'low' : ''}">Stok: ${item.stock || 1}</span>
-        <div class="actions">
-          <button class="btn primary detail-btn" data-index="${index}">Detail</button>
-          <button class="btn secondary contact-btn" data-index="${index}">Hubungi</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  itemList.innerHTML = `
-    <div class="loading" id="loading">
-      <div class="spinner"></div>
-      <div>Loading...</div>
-    </div>
-    ${cardsHtml}
-  `;
-
-  // Assign click events
-  document.querySelectorAll('.wishlist').forEach(btn => {
-    btn.onclick = () => toggleWishlist(btn.getAttribute('data-name'));
-  });
-  document.querySelectorAll('.detail-btn').forEach(btn => {
-    const idx = btn.getAttribute('data-index');
-    btn.onclick = () => openModal(filtered[idx]);
-  });
-  document.querySelectorAll('.contact-btn').forEach(btn => {
-    const idx = btn.getAttribute('data-index');
-    btn.onclick = () => contactSeller(filtered[idx]);
-  });
-}
-
-function render() {
-  clearTimeout(renderTimer);
-  const loader = document.getElementById('loading');
-  if(loader) loader.classList.add('show');
-  renderTimer = setTimeout(renderNow, 120);
-}
-
-// Timer Realtime per detik agar angka terus berjalan mundur
-setInterval(() => {
-  document.querySelectorAll('.timer-tag').forEach(tag => {
-    const createdAt = parseInt(tag.getAttribute('data-created'));
-    if (!isNaN(createdAt)) {
-      tag.textContent = dapatkanSisaWaktuText(createdAt);
+      return `Sisa: ${jam}j ${menit}m ${detik}d`;
     }
-  });
-}, 1000);
 
-// Fungsi Ambil Data dari Firestore
-async function loadItems() {
-  try {
-    const snapshot = await getDocs(collection(db, "items"));
-    const fbItems = [];
-    const waktuSekarang = Date.now();
+    // Fungsi Render Tampilan Data
+    function renderNow() {
+      const q = searchBox.value.toLowerCase().trim();
+      const category = filterBox.value;
+      const sort = sortBox.value;
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      
-      // Proteksi data lama: jika tidak ada createdAt atau formatnya salah
-      if (!data.createdAt || isNaN(Number(data.createdAt))) {
-        data.createdAt = waktuSekarang; 
-      } else {
-        data.createdAt = Number(data.createdAt);
+      activeCategory.textContent = category === 'all' ? 'Semua' : category;
+      totalItems.textContent = items.length;
+
+      let filtered = items.filter(item => {
+        const matchText =
+          (item.name || '').toLowerCase().includes(q) ||
+          (item.seller || '').toLowerCase().includes(q) ||
+          (item.world || '').toLowerCase().includes(q);
+        const matchCategory = category === 'all' || item.category === category;
+        return matchText && matchCategory;
+      });
+
+      if (sort === 'price-asc') filtered.sort((a, b) => a.price - b.price);
+      if (sort === 'price-desc') filtered.sort((a, b) => b.price - a.price);
+
+      visibleItems.textContent = filtered.length;
+      emptyState.style.display = filtered.length ? 'none' : 'block';
+
+      const cardsHtml = filtered.map((item, index) => {
+        const isWish = wishlist.has(item.name);
+        const sisaWaktuText = dapatkanSisaWaktuText(item.createdAt);
+
+        return `
+          <div class="post">
+            <button class="wishlist ${isWish ? 'active' : ''}" data-name="${item.name}">${isWish ? '♥' : '♡'}</button>
+            <h2>${item.name}</h2>
+            <p class="price">Harga: ${item.price} ${item.unit || 'WL'}</p>
+            <div class="meta">
+              <span class="tag">${item.category}</span>
+              <span class="tag">Seller: ${item.seller}</span>
+              <span class="tag">World: ${item.world}</span>
+              <span class="tag timer-tag" data-created="${item.createdAt || Date.now()}">${sisaWaktuText}</span>
+            </div>
+            <span class="stock ${(item.stock || 1) <= 5 ? 'low' : ''}">Stok: ${item.stock || 1}</span>
+            <div class="actions-grid">
+              <button class="btn primary detail-btn" data-index="${index}">Detail</button>
+              <button class="btn secondary contact-btn" data-index="${index}">Hubungi</button>
+              <button class="btn bump bump-btn" data-id="${item.id || ''}">🚀 Up</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      itemList.innerHTML = `
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <div>Loading...</div>
+        </div>
+        ${cardsHtml}
+      `;
+
+      // Assign click events
+      document.querySelectorAll('.wishlist').forEach(btn => {
+        btn.onclick = () => toggleWishlist(btn.getAttribute('data-name'));
+      });
+      document.querySelectorAll('.detail-btn').forEach(btn => {
+        const idx = btn.getAttribute('data-index');
+        btn.onclick = () => openModal(filtered[idx]);
+      });
+      document.querySelectorAll('.contact-btn').forEach(btn => {
+        const idx = btn.getAttribute('data-index');
+        btn.onclick = () => contactSeller(filtered[idx]);
+      });
+      // Aksi Tombol Sundul (Bump)
+      document.querySelectorAll('.bump-btn').forEach(btn => {
+        const idIklan = btn.getAttribute('data-id');
+        btn.onclick = () => bumpIklan(idIklan);
+      });
+    }
+
+    function render() {
+      clearTimeout(renderTimer);
+      const loader = document.getElementById('loading');
+      if(loader) loader.classList.add('show');
+      renderTimer = setTimeout(renderNow, 120);
+    }
+
+    // Timer Realtime per detik
+    setInterval(() => {
+      document.querySelectorAll('.timer-tag').forEach(tag => {
+        const createdAt = parseInt(tag.getAttribute('data-created'));
+        if (!isNaN(createdAt)) {
+          tag.textContent = dapatkanSisaWaktuText(createdAt);
+        }
+      });
+    }, 1000);
+
+    // Fungsi Ambil Data dari Firestore
+    async function loadItems() {
+      try {
+        const snapshot = await getDocs(collection(db, "items"));
+        const fbItems = [];
+        const waktuSekarang = Date.now();
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          // Masukkan ID dokumen Firestore agar data bisa di-update nantinya
+          data.id = doc.id;
+          
+          if (!data.createdAt || isNaN(Number(data.createdAt))) {
+            data.createdAt = waktuSekarang; 
+          } else {
+            data.createdAt = Number(data.createdAt);
+          }
+
+          if (waktuSekarang - data.createdAt < batasWaktuGlobal) {
+            fbItems.push(data);
+          }
+        });
+
+        fbItems.sort((a, b) => b.createdAt - a.createdAt);
+
+        items = fbItems; 
+        render();
+      } catch (err) {
+        console.error("Gagal memuat dari Firebase:", err);
+        render();
+      }
+    }
+
+    // Fungsi Logika untuk "Up/Sundul" Iklan ke Atas Lagi
+    async function bumpIklan(idIklan) {
+      if (!idIklan) {
+        alert("Iklan lokal tidak dapat di-up. Harap refresh halaman!");
+        return;
       }
 
-      // Filter: Hanya tampilkan yang belum lewat 48 jam
-      if (waktuSekarang - data.createdAt < batasWaktuGlobal) {
-        fbItems.push(data);
+      // Ambil data iklan spesifik dari array lokal kita
+      const iklanDitemukan = items.find(item => item.id === idIklan);
+      if (!iklanDitemukan) return;
+
+      // Minta input PIN rahasia dari user
+      const inputPin = prompt("Masukkan 4-angka PIN Iklan kamu untuk melakukan menyundul (Up):");
+      if (inputPin === null) return; // Klik cancel
+
+      // Validasi kecocokan PIN
+      if (String(iklanDitemukan.pin) !== String(inputPin)) {
+        alert("PIN salah! Gagal menyundul iklan.");
+        return;
       }
-    });
 
-    // Urutkan berdasarkan waktu upload terbaru
-    fbItems.sort((a, b) => b.createdAt - a.createdAt);
+      const loader = document.getElementById('loading');
+      if(loader) loader.classList.add('show');
 
-    items = fbItems; 
-    render();
-  } catch (err) {
-    console.error("Gagal memuat dari Firebase:", err);
-    render();
-  }
-}
+      try {
+        // Update waktu pembuatan iklan di database Firebase ke detik ini juga
+        const dataRef = doc(db, "items", idIklan);
+        const waktuTerbaru = Date.now();
+        
+        await updateDoc(dataRef, {
+          createdAt: waktuTerbaru
+        });
 
-function toggleWishlist(name) {
-  if (wishlist.has(name)) wishlist.delete(name);
-  else wishlist.add(name);
-  localStorage.setItem('wishlist', JSON.stringify([...wishlist]));
-  wishlistCount.textContent = wishlist.size;
-  render();
-}
+        alert("Iklan berhasil disundul! Sekarang berada di posisi paling atas.");
+        loadItems(); // Refresh data agar langsung ter-update di layar
+      } catch (error) {
+        console.error("Gagal melakukan sundul:", error);
+        alert("Terjadi masalah jaringan saat menyundul iklan.");
+        render();
+      }
+    }
 
-// Fungsi Modal Detail & Hubungi
-const modal = document.getElementById('modal');
-function openModal(item) {
-  modal.classList.add('open');
-  document.getElementById('modalTitle').textContent = item.name;
-  document.getElementById('modalBody').innerHTML = `
-    <p><strong>Harga:</strong> ${item.price} ${item.unit || 'WL'}</p>
-    <p><strong>Kategori:</strong> ${item.category}</p>
-    <p><strong>Seller:</strong> ${item.seller}</p>
-    <p><strong>World:</strong> ${item.world}</p>
-    <p><strong>Stok:</strong> ${item.stock || 1}</p>
-  `;
-  const text = encodeURIComponent(`Halo ${item.seller}, saya tertarik dengan ${item.name}. World kamu ${item.world} ya?`);
-  document.getElementById('waLink').href = `https://wa.me/6281234567890?text=${text}`;
-  document.getElementById('dcLink').href = `https://discord.com`;
-}
+    function toggleWishlist(name) {
+      if (wishlist.has(name)) wishlist.delete(name);
+      else wishlist.add(name);
+      localStorage.setItem('wishlist', JSON.stringify([...wishlist]));
+      wishlistCount.textContent = wishlist.size;
+      render();
+    }
 
-function contactSeller(item) { openModal(item); }
+    // Fungsi Modal Detail & Hubungi
+    const modal = document.getElementById('modal');
+    function openModal(item) {
+      modal.classList.add('open');
+      document.getElementById('modalTitle').textContent = item.name;
+      document.getElementById('modalBody').innerHTML = `
+        <p><strong>Harga:</strong> ${item.price} ${item.unit || 'WL'}</p>
+        <p><strong>Kategori:</strong> ${item.category}</p>
+        <p><strong>Seller:</strong> ${item.seller}</p>
+        <p><strong>World:</strong> ${item.world}</p>
+        <p><strong>Stok:</strong> ${item.stock || 1}</p>
+      `;
+      const text = encodeURIComponent(`Halo ${item.seller}, saya tertarik dengan ${item.name}. World kamu ${item.world} ya?`);
+      document.getElementById('waLink').href = `https://wa.me/6281234567890?text=${text}`;
+      document.getElementById('dcLink').href = `https://discord.com`;
+    }
 
-// Pasang Iklan Baru ke Firestore
-async function submitItem() {
-  const name = document.getElementById("itemName").value;
-  const price = Number(document.getElementById("itemPrice").value);
-  const world = document.getElementById("itemWorld").value;
-  const seller = document.getElementById("itemSeller").value;
-  const category = document.getElementById("itemCategory").value;
+    function contactSeller(item) { openModal(item); }
 
-  if(!name || !price || !world || !seller) {
-    alert("Mohon isi semua kolom!");
-    return;
-  }
+    // Pasang Iklan Baru ke Firestore + Input PIN
+    async function submitItem() {
+      const name = document.getElementById("itemName").value;
+      const price = Number(document.getElementById("itemPrice").value);
+      const world = document.getElementById("itemWorld").value;
+      const seller = document.getElementById("itemSeller").value;
+      const category = document.getElementById("itemCategory").value;
+      const pin = document.getElementById("itemPin").value; // Ambil nilai PIN
 
-  const newItem = {
-    name,
-    price,
-    world,
-    seller,
-    category,
-    unit: "WL",
-    stock: 1,
-    createdAt: Date.now() // Format Timestamp Angka murni
-  };
+      if(!name || !price || !world || !seller || !pin) {
+        alert("Mohon isi semua kolom, termasuk PIN pengaman!");
+        return;
+      }
 
-  try {
-    await addDoc(collection(db, "items"), newItem);
-    alert("Iklan berhasil dipasang di cloud!");
-    closeSellModal();
-    loadItems(); 
-  } catch (e) {
-    console.error("Error menambah data: ", e);
-    items.unshift(newItem);
-    render();
-    closeSellModal();
-  }
-}
+      if(pin.length < 4) {
+        alert("PIN harus berupa 4 karakter/angka!");
+        return;
+      }
 
-// Kontrol Modal & Tema
-function closeSellModal() { document.getElementById('sellModal').classList.remove('open'); }
-document.getElementById('openSellBtn').onclick = () => document.getElementById('sellModal').classList.add('open');
-document.getElementById('closeSellModalBtn').onclick = closeSellModal;
-document.getElementById('closeModalBtn').onclick = () => modal.classList.remove('open');
-document.getElementById('submitItemBtn').onclick = submitItem;
+      const newItem = {
+        name,
+        price,
+        world,
+        seller,
+        category,
+        unit: "WL",
+        stock: 1,
+        pin: pin, // Menyimpan PIN ke database Firestore
+        createdAt: Date.now() 
+      };
 
-document.getElementById('themeBtn').onclick = () => {
-  document.body.classList.toggle('dark');
-  const isDark = document.body.classList.contains('dark');
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  document.getElementById('themeBtn').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-};
+      try {
+        await addDoc(collection(db, "items"), newItem);
+        alert("Iklan berhasil dipasang di cloud!");
+        
+        // Reset form input PIN
+        document.getElementById("itemPin").value = "";
+        
+        closeSellModal();
+        loadItems(); 
+      } catch (e) {
+        console.error("Error menambah data: ", e);
+        items.unshift(newItem);
+        render();
+        closeSellModal();
+      }
+    }
 
-searchBox.addEventListener('input', render);
-filterBox.addEventListener('change', render);
-sortBox.addEventListener('change', render);
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    // Kontrol Modal & Tema
+    function closeSellModal() { document.getElementById('sellModal').classList.remove('open'); }
+    document.getElementById('openSellBtn').onclick = () => document.getElementById('sellModal').classList.add('open');
+    document.getElementById('closeSellModalBtn').onclick = closeSellModal;
+    document.getElementById('closeModalBtn').onclick = () => modal.classList.remove('open');
+    document.getElementById('submitItemBtn').onclick = submitItem;
 
-if (localStorage.getItem('theme') === 'dark') {
-  document.body.classList.add('dark');
-  document.getElementById('themeBtn').textContent = '☀️ Light Mode';
-}
-wishlistCount.textContent = wishlist.size;
-loadItems();
+    document.getElementById('themeBtn').onclick = () => {
+      document.body.classList.toggle('dark');
+      const isDark = document.body.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      document.getElementById('themeBtn').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    };
+
+    searchBox.addEventListener('input', render);
+    filterBox.addEventListener('change', render);
+    sortBox.addEventListener('change', render);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark');
+      document.getElementById('themeBtn').textContent = '☀️ Light Mode';
+    }
+    wishlistCount.textContent = wishlist.size;
+    loadItems();
   </script>
 </body>
 </html>
