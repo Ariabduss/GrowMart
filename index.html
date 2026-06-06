@@ -468,6 +468,14 @@
         }, 180);
       }
     }
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCaaqw2TaFnaGZJiAiMEq9VbOlBnrXezI",
+  authDomain: "growmart-92dee.firebaseapp.com",
+  projectId: "growmart-92dee",
+  storageBucket: "growmart-92dee.firebasestorage.app",
+  messagingSenderId: "690014710400",
+  appId: "1:690014710400:web:1c46d4f399c2f0a9d19465",
+  measurementId: "G-2EC9S745HM"};
 
     function render() {
       clearTimeout(renderTimer);
@@ -498,6 +506,20 @@
       waLink.href = `https://wa.me/6281234567890?text=${text}`;
       dcLink.href = `https://discord.com`;
     }
+    async function loadItems() {
+
+  const snapshot = await getDocs(
+    collection(db, "items")
+  );
+
+  items = [];
+
+  snapshot.forEach(doc => {
+    items.push(doc.data());
+  });
+
+  render();
+}
 
     function openModal(item) {
       modal.classList.add('open');
@@ -547,16 +569,37 @@ function closeSellModal() {
   document.getElementById('sellModal').classList.remove('open');
 }
 
-function submitItem() {
-  const name = document.getElementById('itemName').value;
-  const price = document.getElementById('itemPrice').value;
-  const world = document.getElementById('itemWorld').value;
-  const seller = document.getElementById('itemSeller').value;
+async function submitItem() {
 
-  if (!name || !price || !world || !seller) {
-    alert("Lengkapi semua data!");
-    return;
-  }
+  const name =
+    document.getElementById("itemName").value;
+
+  const price =
+    Number(document.getElementById("itemPrice").value);
+
+  const world =
+    document.getElementById("itemWorld").value;
+
+  const seller =
+    document.getElementById("itemSeller").value;
+
+  await addDoc(
+    collection(db, "items"),
+    {
+      name,
+      price,
+      world,
+      seller,
+      category: "rare",
+      unit: "WL",
+      stock: 1
+    }
+  );
+
+  loadItems();
+
+  alert("Iklan berhasil dipasang!");
+}
 
   items.unshift({
     name,
@@ -574,6 +617,26 @@ function submitItem() {
 
   alert("Iklan berhasil dipasang!");
 }
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBCaaqw2TaFnaGZJiAiMEq9VbOlBnrXezI",
+  authDomain: "growmart-92dee.firebaseapp.com",
+  projectId: "growmart-92dee",
+  storageBucket: "growmart-92dee.firebasestorage.app",
+  messagingSenderId: "690014710400",
+  appId: "1:690014710400:web:1c46d4f399c2f0a9d19465",
+  measurementId: "G-2EC9S745HM"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.db = db;
+window.addDoc = addDoc;
+window.collection = collection;
+window.getDocs = getDocs;
+
   </script>
   
 </body>
