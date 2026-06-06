@@ -189,6 +189,12 @@
       background: rgba(245,158,11,0.12);
       color: #d97706;
     }
+    /* Style Tambahan untuk Label Sisa Waktu */
+    .timer-tag {
+      background: rgba(239, 68, 68, 0.1) !important;
+      color: #ef4444 !important;
+      font-weight: bold;
+    }
     .actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -381,7 +387,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Konfigurasi Firebase milikmu
     const firebaseConfig = {
       apiKey: "AIzaSyBCaaqw2TaFnaGZJiAiMEq9VbOlBnrXezI",
       authDomain: "growmart-92dee.firebaseapp.com",
@@ -395,14 +400,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Array penampung data iklan
-    let items = [
-      { name: '200 Lava Seed', price: 2, unit: 'WL', category: 'seed', seller: 'GrowPro', world: 'WLGROWPRO', stock: 18, createdAt: Date.now() },
-      { name: '100 Chandelier', price: 1, unit: 'WL', category: 'block', seller: 'LampShop', world: 'WLLAMPSHOP', stock: 6, createdAt: Date.now() },
-      { name: '50 Pepper Tree', price: 3, unit: 'WL', category: 'seed', seller: 'PepperKing', world: 'WLPEPPER', stock: 12, createdAt: Date.now() },
-      { name: '200 Dirt Block', price: 1, unit: 'WL', category: 'block', seller: 'BlockMart', world: 'WLBLOCK', stock: 24, createdAt: Date.now() },
-      { name: '10 Magplant', price: 25, unit: 'WL', category: 'rare', seller: 'RareVault', world: 'WLRARE', stock: 2, createdAt: Date.now() }
-    ];
+    let items = [];
+    const batasWaktuGlobal = 48 * 60 * 60 * 1000; // 48 jam dalam milidetik
 
     const itemList = document.getElementById('itemList');
     const searchBox = document.getElementById('searchBox');
@@ -416,6 +415,20 @@
 
     const wishlist = new Set(JSON.parse(localStorage.getItem('wishlist') || '[]'));
     let renderTimer = null;
+
+    // Fungsi pembantu untuk menghitung string sisa waktu countdown
+    function dapatkanSisaWaktuText(createdAt) {
+      if (!createdAt) return "Sisa: -";
+      const selisih = (createdAt + batasWaktuGlobal) - Date.now();
+      if (selisih <= 0) return "Kedaluwarsa";
+
+      const totalDetik = Math.floor(selisih / 1000);
+      const jam = Math.floor(totalDetik / 3600);
+      const menit = Math.floor((totalDetik % 3600) / 60);
+      const detik = totalDetik % 60;
+
+      return `Sisa: ${jam}j ${menit}m ${detik}d`;
+    }
 
     // Fungsi Render Tampilan Data
     function renderNow() {
@@ -441,9 +454,11 @@
       visibleItems.textContent = filtered.length;
       emptyState.style.display = filtered.length ? 'none' : 'block';
 
-      // Buat elemen posts HTML
       const cardsHtml = filtered.map((item, index) => {
         const isWish = wishlist.has(item.name);
+        // panggil fungsi teks countdown waktu
+        const sisaWaktuText = dapatkanSisaWaktuText(item.createdAt);
+
         return `
           <div class="post">
             <button class="wishlist ${isWish ? 'active' : ''}" data-name="${item.name}">${isWish ? '♥' : '♡'}</button>
@@ -453,6 +468,7 @@
               <span class="tag">${item.category}</span>
               <span class="tag">Seller: ${item.seller}</span>
               <span class="tag">World: ${item.world}</span>
+              <span class="tag timer-tag" data-created="${item.createdAt || 0}">${sisaWaktuText}</span>
             </div>
             <span class="stock ${(item.stock || 1) <= 5 ? 'low' : ''}">Stok: ${item.stock || 1}</span>
             <div class="actions">
@@ -492,32 +508,37 @@
       renderTimer = setTimeout(renderNow, 120);
     }
 
-    // Fungsi Ambil Data dari Firestore + Filter 48 Jam Otomatis
+    // Timer Realtime: Mengupdate teks countdown di layar setiap 1 detik sekali tanpa refresh database
+    setInterval(() => {
+      document.querySelectorAll('.timer-tag').forEach(tag => {
+        const createdAt = parseInt(tag.getAttribute('data-created'));
+        if (createdAt > 0) {
+          tag.textContent = dapatkanSisaWaktuText(createdAt);
+        }
+      });
+    }, 1000);
+
+    // Fungsi Ambil Data dari Firestore
     async function loadItems() {
       try {
         const snapshot = await getDocs(collection(db, "items"));
         const fbItems = [];
-        const batasWaktu = 48 * 60 * 60 * 1000; // 48 jam dalam milidetik
         const waktuSekarang = Date.now();
 
         snapshot.forEach(doc => {
           const data = doc.data();
-          
-          // Filter: Hanya tampilkan jika tidak punya createdAt ATAU umurnya belum lewat 48 jam
-          if (!data.createdAt || (waktuSekarang - data.createdAt < batasWaktu)) {
+          // Filter ketat di client side agar data lewat 48 jam tidak masuk array
+          if (!data.createdAt || (waktuSekarang - data.createdAt < batasWaktuGlobal)) {
             fbItems.push(data);
           }
         });
 
-        // Urutkan dari iklan terbaru ke terlama berdasarkan tanggal dibuat
         fbItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-        if(fbItems.length > 0) {
-          items = fbItems; 
-        }
+        items = fbItems; 
         render();
       } catch (err) {
-        console.error("Gagal memuat dari Firebase, memakai data lokal:", err);
+        console.error("Gagal memuat dari Firebase:", err);
         render();
       }
     }
@@ -547,11 +568,9 @@
       document.getElementById('dcLink').href = `https://discord.com`;
     }
 
-    function contactSeller(item) {
-      openModal(item);
-    }
+    function contactSeller(item) { openModal(item); }
 
-    // Pasang Iklan Baru ke Firestore + Simpan Waktu Upload
+    // Pasang Iklan Baru ke Firestore
     async function submitItem() {
       const name = document.getElementById("itemName").value;
       const price = Number(document.getElementById("itemPrice").value);
@@ -564,7 +583,6 @@
         return;
       }
 
-      // Record waktu saat ini menggunakan Date.now()
       const newItem = {
         name,
         price,
@@ -580,10 +598,9 @@
         await addDoc(collection(db, "items"), newItem);
         alert("Iklan berhasil dipasang di cloud!");
         closeSellModal();
-        loadItems(); // Refresh data otomatis dari Firestore
+        loadItems(); 
       } catch (e) {
         console.error("Error menambah data: ", e);
-        // Fallback lokal jika jaringan/Firebase bermasalah
         items.unshift(newItem);
         render();
         closeSellModal();
@@ -604,13 +621,11 @@
       document.getElementById('themeBtn').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
     };
 
-    // Event Listener Filter & Cari
     searchBox.addEventListener('input', render);
     filterBox.addEventListener('change', render);
     sortBox.addEventListener('change', render);
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
 
-    // Inisialisasi awal saat halaman dibuka
     if (localStorage.getItem('theme') === 'dark') {
       document.body.classList.add('dark');
       document.getElementById('themeBtn').textContent = '☀️ Light Mode';
