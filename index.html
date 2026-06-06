@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GrowTrade Premium</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #1da1f2;
+      --primary-dark: #0d8ddb;
+      --border: #e5e7eb;
+      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+      --chip: #eef6ff;
+    }
+    body.dark {
+      --bg: #0f172a;
+      --card: #111827;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --primary: #38bdf8;
+      --primary-dark: #0ea5e9;
+      --border: #1f2937;
+      --shadow: 0 10px 30px rgba(0,0,0,0.25);
+      --chip: #172554;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      transition: background .2s ease, color .2s ease;
+    }
+    header {
+      background: linear-gradient(135deg, #1da1f2, #0d8ddb);
+      color: white;
+      padding: 24px 16px;
+      box-shadow: var(--shadow);
+    }
+    .header-wrap, .container, .toolbar, .stats {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { margin: 0 0 6px; font-size: 30px; }
+    header p { margin: 0; opacity: 0.95; }
+    .theme-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: bold;
+      background: rgba(255,255,255,0.18);
+      color: white;
+    }
+
+    .toolbar {
+      margin-top: 18px;
+      padding: 0 16px;
+      display: grid;
+      grid-template-columns: 1fr repeat(3, auto);
+      gap: 12px;
+      align-items: center;
+    }
+    .search, .filter, .sort {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+      background: var(--card);
+      color: var(--text);
+      font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+    .search { width: 100%; }
+
+    .stats {
+      margin-top: 16px;
+      padding: 0 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .stat .label { color: var(--muted); font-size: 13px; }
+    .stat .value { font-size: 24px; font-weight: bold; margin-top: 6px; }
+
+    .container {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      position: relative;
+      min-height: 120px;
+    }
+    .loading {
+      display: none;
+      position: absolute;
+      inset: 16px;
+      z-index: 10;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.65);
+      backdrop-filter: blur(3px);
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text);
+      font-weight: bold;
+    }
+    body.dark .loading {
+      background: rgba(15, 23, 42, 0.55);
+    }
+    .loading.show { display: flex; }
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(0,0,0,0.12);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .post {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .post:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.12);
+    }
+    .post h2 { margin: 0 0 8px; font-size: 18px; }
+    .post p {
+      margin: 6px 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .price {
+      color: var(--primary);
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 10px 0 12px;
+    }
+    .tag {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: var(--primary-dark);
+    }
+    .stock {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.12);
+      color: #16a34a;
+      font-weight: bold;
+    }
+    .stock.low {
+      background: rgba(245,158,11,0.12);
+      color: #d97706;
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      padding: 10px 12px;
+    }
+    .btn.primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn.primary:hover { background: var(--primary-dark); }
+    .btn.secondary {
+      background: var(--chip);
+      color: var(--text);
+    }
+    .wishlist {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 50%;
+      cursor: pointer;
+      background: rgba(255,255,255,0.95);
+      box-shadow: var(--shadow);
+      font-size: 18px;
+    }
+    .wishlist.active {
+      color: #ef4444;
+    }
+    .empty {
+      max-width: 1100px;
+      margin: 20px auto;
+      padding: 0 16px;
+      color: var(--muted);
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .modal.open { display: flex; }
+    .modal-box {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card);
+      color: var(--text);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .close {
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+    }
+    .modal-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .link-btn {
+      display: inline-block;
+      text-align: center;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: bold;
+      color: white;
+    }
+    .wa { background: #25D366; }
+    .dc { background: #5865F2; }
+
+    @media (max-width: 700px) {
+      header h1 { font-size: 24px; }
+      .toolbar { grid-template-columns: 1fr; }
+      .modal-links { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-wrap">
+      <div class="header-top">
+        <div>
+          <h1>GrowTrade Premium</h1>
+          <p>Marketplace Item Growtopia</p>
+        </div>
+        <button class="theme-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <input id="searchBox" class="search" type="text" placeholder="Cari item...">
+    <select id="filterBox" class="filter">
+      <option value="all">Semua kategori</option>
+      <option value="seed">Seed</option>
+      <option value="block">Block</option>
+      <option value="farm">Farm</option>
+      <option value="rare">Rare</option>
+    </select>
+    <select id="sortBox" class="sort">
+      <option value="new">Sort: Default</option>
+      <option value="price-asc">Harga termurah</option>
+      <option value="price-desc">Harga termahal</option>
+    </select>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Total Item</div><div class="value" id="totalItems">0</div></div>
+    <div class="stat"><div class="label">Kategori Aktif</div><div class="value" id="activeCategory">Semua</div></div>
+    <div class="stat"><div class="label">Item Tersedia</div><div class="value" id="visibleItems">0</div></div>
+    <div class="stat"><div class="label">Wishlist</div><div class="value" id="wishlistCount">0</div></div>
+  </div>
+
+  <div class="empty" id="emptyState">Tidak ada item yang cocok.</div>
+  <div class="container" id="itemList">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Loading...</div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <strong id="modalTitle">Detail</strong>
+        <button class="close" onclick="closeModal()">×</button>
+      </div>
+      <div id="modalBody"></div>
+      <div class="modal-links">
+        <a id="waLink" class="link-btn wa" target="_blank" rel="noopener">Chat WhatsApp</a>
+        <a id="dcLink" class="link-btn dc" target="_blank" rel="noopener">Discord</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const items = [
+      { name: '200 Lava Seed', price: 2, unit: 'WL', category: 'seed', seller: 'GrowPro', world: 'WLGROWPRO', stock: 18 },
+      { name: '100 Chandelier', price: 1, unit: 'WL', category: 'block', seller: 'LampShop', world: 'WLLAMPSHOP', stock: 6 },
+      { name: '50 Pepper Tree', price: 3, unit: 'WL', category: 'seed', seller: 'PepperKing', world: 'WLPEPPER', stock: 12 },
+      { name: '200 Dirt Block', price: 1, unit: 'WL', category: 'block', seller: 'BlockMart', world: 'WLBLOCK', stock: 24 },
+      { name: '10 Magplant', price: 25, unit: 'WL', category: 'rare', seller: 'RareVault', world: 'WLRARE', stock: 2 },
+      { name: '100 Venus Guytrap', price: 4, unit: 'WL', category: 'seed', seller: 'TrapFarm', world: 'WLTRAP', stock: 9 },
+      { name: '50 Rainbow Block', price: 6, unit: 'WL', category: 'block', seller: 'RainbowStore', world: 'WLRB', stock: 7 },
+      { name: '20 Royal Lock', price: 12, unit: 'WL', category: 'rare', seller: 'LockZone', world: 'WLLOCK', stock: 4 },
+      { name: '100 Bones', price: 2, unit: 'WL', category: 'farm', seller: 'BoneFarm', world: 'WLBONE', stock: 15 },
+      { name: '30 Dirt Seed', price: 5, unit: 'WL', category: 'farm', seller: 'SeedHub', world: 'WLSEED', stock: 11 }
+    ];
+
+    const itemList = document.getElementById('itemList');
+    const searchBox = document.getElementById('searchBox');
+    const filterBox = document.getElementById('filterBox');
+    const sortBox = document.getElementById('sortBox');
+    const totalItems = document.getElementById('totalItems');
+    const visibleItems = document.getElementById('visibleItems');
+    const activeCategory = document.getElementById('activeCategory');
+    const emptyState = document.getElementById('emptyState');
+    const wishlistCount = document.getElementById('wishlistCount');
+    const loading = document.getElementById('loading');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const waLink = document.getElementById('waLink');
+    const dcLink = document.getElementById('dcLink');
+
+    const wishlist = new Set(JSON.parse(localStorage.getItem('wishlist') || '[]'));
+    let renderTimer = null;
+
+    totalItems.textContent = items.length;
+    updateWishlistCount();
+
+    function renderNow() {
+      const q = searchBox.value.toLowerCase().trim();
+      const category = filterBox.value;
+      const sort = sortBox.value;
+
+      activeCategory.textContent = category === 'all' ? 'Semua' : category;
+
+      let filtered = items.filter(item => {
+        const matchText =
+          item.name.toLowerCase().includes(q) ||
+          item.seller.toLowerCase().includes(q) ||
+          item.world.toLowerCase().includes(q);
+        const matchCategory = category === 'all' || item.category === category;
+        return matchText && matchCategory;
+      });
+
+      if (sort === 'price-asc') filtered.sort((a, b) => a.price - b.price);
+      if (sort === 'price-desc') filtered.sort((a, b) => b.price - a.price);
+
+      visibleItems.textContent = filtered.length;
+      emptyState.style.display = filtered.length ? 'none' : 'block';
+
+      itemList.innerHTML = `
+        <div class="loading show" id="loading">
+          <div class="spinner"></div>
+          <div>Loading...</div>
+        </div>
+        ${filtered.map(item => `
+          <div class="post">
+            <button class="wishlist ${wishlist.has(item.name) ? 'active' : ''}" onclick="toggleWishlist('${item.name}')">${wishlist.has(item.name) ? '♥' : '♡'}</button>
+            <h2>${item.name}</h2>
+            <p class="price">Harga: ${item.price} ${item.unit}</p>
+            <div class="meta">
+              <span class="tag">${item.category}</span>
+              <span class="tag">Seller: ${item.seller}</span>
+              <span class="tag">World: ${item.world}</span>
+            </div>
+            <span class="stock ${item.stock <= 5 ? 'low' : ''}">Stok: ${item.stock}</span>
+            <div class="actions">
+              <button class="btn primary" onclick='openModal(${JSON.stringify(item)})'>Detail</button>
+              <button class="btn secondary" onclick='contactSeller(${JSON.stringify(item)})'>Hubungi</button>
+            </div>
+          </div>
+        `).join('')}
+      `;
+
+      const currentLoading = document.getElementById('loading');
+      if (currentLoading) {
+        setTimeout(() => {
+          currentLoading.classList.remove('show');
+        }, 180);
+      }
+    }
+
+    function render() {
+      clearTimeout(renderTimer);
+      itemList.innerHTML = `
+        <div class="loading show" id="loading">
+          <div class="spinner"></div>
+          <div>Loading...</div>
+        </div>
+      `;
+      renderTimer = setTimeout(renderNow, 120);
+    }
+
+    function toggleWishlist(name) {
+      if (wishlist.has(name)) wishlist.delete(name);
+      else wishlist.add(name);
+      localStorage.setItem('wishlist', JSON.stringify([...wishlist]));
+      updateWishlistCount();
+      render();
+    }
+
+    function updateWishlistCount() {
+      wishlistCount.textContent = wishlist.size;
+    }
+
+    function contactSeller(item) {
+      openModal(item);
+      const text = encodeURIComponent(`Halo ${item.seller}, saya tertarik dengan ${item.name}. World kamu ${item.world} ya?`);
+      waLink.href = `https://wa.me/6281234567890?text=${text}`;
+      dcLink.href = `https://discord.com`;
+    }
+
+    function openModal(item) {
+      modal.classList.add('open');
+      modalTitle.textContent = item.name;
+      modalBody.innerHTML = `
+        <p><strong>Harga:</strong> ${item.price} ${item.unit}</p>
+        <p><strong>Kategori:</strong> ${item.category}</p>
+        <p><strong>Seller:</strong> ${item.seller}</p>
+        <p><strong>World:</strong> ${item.world}</p>
+        <p><strong>Stok:</strong> ${item.stock}</p>
+      `;
+      const text = encodeURIComponent(`Halo ${item.seller}, saya tertarik dengan ${item.name}. World kamu ${item.world} ya?`);
+      waLink.href = `https://wa.me/6281234567890?text=${text}`;
+      dcLink.href = `https://discord.com`;
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+      document.querySelector('.theme-btn').textContent = document.body.classList.contains('dark') ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark');
+      document.querySelector('.theme-btn').textContent = '☀️ Light Mode';
+    }
+
+    searchBox.addEventListener('input', render);
+    filterBox.addEventListener('change', render);
+    sortBox.addEventListener('change', render);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    render();
+  </script>
+</body>
+</html>
